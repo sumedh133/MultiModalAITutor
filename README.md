@@ -264,46 +264,44 @@ agriassist-ai/
 
 # Development Setup
 
-The project is currently intended for **local development**.
+The project uses **uv** for dependency and environment management instead of `venv` and `pip`.
 
 ---
 
-## 1. Clone the Repository
+## 1. Install uv
 
+Install uv using pip:
+
+```bash
+pip install uv
 ```
+
+Or using the official installer:
+
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+
+---
+
+## 2. Clone the Repository
+
+```bash
 git clone <repository-url>
 cd agriassist-ai
 ```
 
 ---
 
-## 2. Create Virtual Environment
-
-```
-python -m venv venv
-```
-
-Activate it.
-
-Windows
-
-```
-venv\Scripts\activate
-```
-
-Mac/Linux
-
-```
-source venv/bin/activate
-```
-
----
-
 ## 3. Install Dependencies
 
+Install all project dependencies listed in `pyproject.toml`:
+
+```bash
+uv sync
 ```
-pip install -r requirements.txt
-```
+
+This will create the project environment and install all required packages.
 
 ---
 
@@ -324,10 +322,10 @@ JWT_SECRET=random_secret_key
 
 ## 5. Run the Application
 
-Start the Streamlit development server.
+Start the development server:
 
-```
-streamlit run app/main.py
+```bash
+uv run python -m streamlit run app/main.py
 ```
 
 The application will run at:
@@ -337,6 +335,49 @@ http://localhost:8501
 ```
 
 ---
+
+# Managing Dependencies
+
+This project uses **uv** for dependency management.  
+Do **not** use `pip install` directly.
+
+---
+
+## Add a New Dependency
+
+To install a new package:
+
+```bash
+uv add package-name
+```
+
+Example:
+
+```bash
+uv add pandas
+```
+
+This will automatically:
+
+- install the package
+- update `pyproject.toml`
+- update `uv.lock`
+
+---
+
+## Add a Development Dependency
+
+For development tools such as testing, linting, or formatting:
+
+```bash
+uv add --dev package-name
+```
+
+Example:
+
+```bash
+uv add --dev pytest ruff black
+```
 
 # Development Workflow
 

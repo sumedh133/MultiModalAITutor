@@ -1,9 +1,47 @@
-streamlit
-langchain
-langchain-google-genai
-python-dotenv
-pymongo
-bcrypt
-pyjwt
-requests
-duckduckgo-search
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments (if anyone accidentally creates one)
+venv/
+.env/
+.env.*
+
+# Environment variables / secrets
+.env
+
+# Python build files
+build/
+dist/
+*.egg-info/
+
+# Test cache
+.pytest_cache/
+
+# Coverage reports
+.coverage
+htmlcov/
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+
+# Jupyter notebooks
+.ipynb_checkpoints/
+
+# Streamlit cache
+.streamlit/
+
+# Docker
+*.pid
+
+# Local development files
+*.sqlite3

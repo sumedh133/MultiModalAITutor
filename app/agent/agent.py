@@ -5,7 +5,7 @@ from app.config import GOOGLE_API_KEY
 def get_agent():
 
     llm = ChatGoogleGenerativeAI(
-        model="gemini-1.5-flash",
+        model="gemini-2.5-flash",
         google_api_key=GOOGLE_API_KEY
     )
 
