@@ -9,4 +9,4 @@ RUN uv sync
 
 COPY . .
 
-CMD uv run streamlit run app/main.py --server.port=$PORT --server.headless=true
+CMD uv run python -m streamlit run app/main.py --server.port=$PORT --server.headless=true
