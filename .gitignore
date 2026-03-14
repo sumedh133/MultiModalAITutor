@@ -1,0 +1,9 @@
+streamlit
+langchain
+langchain-google-genai
+python-dotenv
+pymongo
+bcrypt
+pyjwt
+requests
+duckduckgo-search
