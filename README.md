@@ -288,7 +288,7 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 
 ```bash
 git clone <repository-url>
-cd agriassist-ai
+cd AgriBot
 ```
 
 ---
