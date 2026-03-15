@@ -1,35 +1,18 @@
 import streamlit as st
+from app.ui.auth_page import show_auth_page
+from app.ui.chat_page import show_chat_page
 from app.database.health_check import check_database_connection
-from app.agent.agent import get_agent
 
 st.set_page_config(page_title="AgriAssist AI")
 
-st.title("🌾 AgriAssist AI")
-
 if not check_database_connection():
-    st.error("Database connection failed")
-    st.stop()
+        st.error("Database connection failed")
+        st.stop()
 
-if "messages" not in st.session_state:
-    st.session_state.messages = []
+if "token" not in st.session_state:
+    st.session_state.token = None
 
-llm = get_agent()
-
-user_input = st.chat_input("Ask your farming question")
-
-if user_input:
-
-    st.session_state.messages.append(
-        {"role": "user", "content": user_input}
-    )
-
-    response = llm.invoke(user_input)
-
-    st.session_state.messages.append(
-        {"role": "assistant", "content": response.content}
-    )
-
-for msg in st.session_state.messages:
-
-    with st.chat_message(msg["role"]):
-        st.write(msg["content"])
+if st.session_state.token is None:
+    show_auth_page()
+else:
+    show_chat_page()
