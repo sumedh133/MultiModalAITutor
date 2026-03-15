@@ -5,7 +5,7 @@ from app.auth.auth_service import AuthService
 auth_service = AuthService()
 
 
-def show_auth_page():
+def show_auth_page(cookies):
 
     st.title("🌾 AgriAssist AI")
 
@@ -31,6 +31,9 @@ def show_auth_page():
                 st.session_state.token = token
                 st.session_state.user_id = decode_token(token)
                 st.session_state.user = user
+    
+                cookies["auth_token"] = token
+                cookies.save()
 
                 st.rerun()
 
@@ -54,5 +57,8 @@ def show_auth_page():
                 st.session_state.token = token
                 st.session_state.user_id = decode_token(token)
                 st.session_state.user = user
+                
+                cookies["auth_token"] = token
+                cookies.save()
 
                 st.rerun()

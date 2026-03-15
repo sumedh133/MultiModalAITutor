@@ -2,7 +2,7 @@ import streamlit as st
 from app.agent.agent import get_agent
 
 
-def show_chat_page():
+def show_chat_page(cookies):
 
     st.title("🌾 AgriAssist AI")
 
@@ -11,7 +11,12 @@ def show_chat_page():
         st.write(f"👤 Logged in as: {st.session_state.user['email']}")
 
         if st.button("Logout"):
+
+            cookies["auth_token"] = ""
+            cookies.save()
+
             st.session_state.clear()
+            st.session_state.logout = True
             st.rerun()
 
     if "messages" not in st.session_state:

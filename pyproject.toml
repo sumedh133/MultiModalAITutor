@@ -12,4 +12,5 @@ dependencies = [
     "pymongo>=4.16.0",
     "python-dotenv>=1.2.2",
     "streamlit>=1.55.0",
+    "streamlit-cookies-manager>=0.2.0",
 ]
