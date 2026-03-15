@@ -1,9 +1,14 @@
 import streamlit as st
+from app.database.health_check import check_database_connection
 from app.agent.agent import get_agent
 
 st.set_page_config(page_title="AgriAssist AI")
 
 st.title("🌾 AgriAssist AI")
+
+if not check_database_connection():
+    st.error("Database connection failed")
+    st.stop()
 
 if "messages" not in st.session_state:
     st.session_state.messages = []
