@@ -30,16 +30,19 @@ def show_chat_page(cookies):
     # Sidebar
     with st.sidebar:
 
-        st.write(f"👤 Logged in as: {st.session_state.user['email']}")
+        profile_col, logout_col = st.columns([5,2], vertical_alignment="center")
 
-        if st.button("Logout"):
+        with profile_col:
+            st.write(f"Profile: {st.session_state.user['email']}")
 
-            cookies["auth_token"] = ""
-            cookies.save()
+        with logout_col:
+            if st.button("↩️", help="Logout"):
+                cookies["auth_token"] = ""
+                cookies.save()
 
-            st.session_state.clear()
-            st.session_state.logout = True
-            st.rerun()
+                st.session_state.clear()
+                st.session_state.logout = True
+                st.rerun()
 
         st.divider()
 
@@ -47,14 +50,16 @@ def show_chat_page(cookies):
             st.session_state.user["_id"]
         )
 
-        st.subheader(f"Your Chats ({len(conversations)})")
+        title_col, button_col = st.columns([5,2])
 
-        # New Chat
-        if st.button("➕ New Chat"):
+        with title_col:
+            st.subheader(f"Your Chats ({len(conversations)})")
 
-            if st.session_state.conversation_id is not None:
-                st.session_state.conversation_id = None
-                st.query_params.clear()
+        with button_col:
+            if st.button("➕", help="New Chat"):
+                if st.session_state.conversation_id is not None:
+                    st.session_state.conversation_id = None
+                    st.query_params.clear()
 
         # Chat List
         for convo in conversations:
