@@ -1,13 +1,32 @@
 import streamlit as st
+from bson import ObjectId
+
 from app.agent.agent import get_agent
 
+from app.database.chat_repository import (
+    create_conversation,
+    add_message,
+    get_messages,
+    get_user_conversations
+)
 
 def show_chat_page(cookies):
+
+    # Restore conversation from URL
+    params = st.query_params
+
+    if "conversation_id" not in st.session_state:
+
+        if "chat" in params:
+            st.session_state.conversation_id = ObjectId(params["chat"])
+        else:
+            st.session_state.conversation_id = None
 
     st.title("🌾 AgriAssist AI")
 
     # Sidebar
     with st.sidebar:
+
         st.write(f"👤 Logged in as: {st.session_state.user['email']}")
 
         if st.button("Logout"):
@@ -19,26 +38,95 @@ def show_chat_page(cookies):
             st.session_state.logout = True
             st.rerun()
 
-    if "messages" not in st.session_state:
-        st.session_state.messages = []
+        st.divider()
+
+        conversations = get_user_conversations(
+            st.session_state.user["_id"]
+        )
+
+        st.subheader(f"Your Chats ({len(conversations)})")
+
+        # New Chat
+        if st.button("➕ New Chat"):
+
+            if st.session_state.conversation_id is not None:
+                st.session_state.conversation_id = None
+                st.query_params.clear()
+                
+
+        # Chat List
+        for convo in conversations:
+
+            title = convo.get("title", "New Chat")
+
+            is_active = convo["_id"] == st.session_state.conversation_id
+
+            label = f"🟢 {title}" if is_active else title
+
+            if st.button(label, key=str(convo["_id"])):
+
+                st.session_state.conversation_id = convo["_id"]
+                st.query_params["chat"] = str(convo["_id"])
+                st.rerun()
 
     llm = get_agent()
 
+    # Empty chat state
+    if st.session_state.conversation_id is None:
+        st.info("Start a new conversation by asking a question.")
+
+    # Load messages
+    if st.session_state.conversation_id:
+
+        messages = get_messages(st.session_state.conversation_id)
+
+        for msg in messages:
+
+            with st.chat_message(msg["role"]):
+                st.write(msg["content"])
+
+    # Chat input
     user_input = st.chat_input("Ask your farming question")
 
     if user_input:
 
-        st.session_state.messages.append(
-            {"role": "user", "content": user_input}
+        # Create conversation on first message
+        if st.session_state.conversation_id is None:
+
+            conversation_id = create_conversation(
+                st.session_state.user["_id"]
+            )
+
+            st.session_state.conversation_id = conversation_id
+            st.query_params["chat"] = str(conversation_id)
+
+        conversation_id = st.session_state.conversation_id
+
+        # Save user message
+        add_message(
+            conversation_id,
+            "user",
+            user_input
         )
 
+        # Show user message immediately
+        with st.chat_message("user"):
+            st.write(user_input)
+
+        # LLM response
         response = llm.invoke(user_input)
+        assistant_reply = response.content
 
-        st.session_state.messages.append(
-            {"role": "assistant", "content": response.content}
+        # Save assistant message
+        add_message(
+            conversation_id,
+            "assistant",
+            assistant_reply
         )
 
-    for msg in st.session_state.messages:
+        # Show assistant message
+        with st.chat_message("assistant"):
+            st.write(assistant_reply)
 
-        with st.chat_message(msg["role"]):
-            st.write(msg["content"])
+        # Force rerun so sidebar updates
+        st.rerun()
