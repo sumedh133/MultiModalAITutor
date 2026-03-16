@@ -2,13 +2,16 @@ import streamlit as st
 from bson import ObjectId
 
 from app.agent.agent import get_agent
+from app.agent.title_generation import generate_chat_title
 
 from app.database.chat_repository import (
     create_conversation,
     add_message,
     get_messages,
-    get_user_conversations
+    get_user_conversations,
+    update_conversation_title
 )
+
 
 def show_chat_page(cookies):
 
@@ -52,7 +55,6 @@ def show_chat_page(cookies):
             if st.session_state.conversation_id is not None:
                 st.session_state.conversation_id = None
                 st.query_params.clear()
-                
 
         # Chat List
         for convo in conversations:
@@ -90,6 +92,8 @@ def show_chat_page(cookies):
 
     if user_input:
 
+        is_new_conversation = False
+
         # Create conversation on first message
         if st.session_state.conversation_id is None:
 
@@ -99,6 +103,8 @@ def show_chat_page(cookies):
 
             st.session_state.conversation_id = conversation_id
             st.query_params["chat"] = str(conversation_id)
+
+            is_new_conversation = True
 
         conversation_id = st.session_state.conversation_id
 
@@ -127,6 +133,16 @@ def show_chat_page(cookies):
         # Show assistant message
         with st.chat_message("assistant"):
             st.write(assistant_reply)
+
+        # Generate chat title only once
+        if is_new_conversation:
+
+            title = generate_chat_title(user_input)
+
+            update_conversation_title(
+                conversation_id,
+                title
+            )
 
         # Force rerun so sidebar updates
         st.rerun()

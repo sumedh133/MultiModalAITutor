@@ -67,6 +67,13 @@ def get_user_conversations(user_id):
     ).sort("updated_at", -1)
 
     return list(conversations)
+
+def update_conversation_title(conversation_id, title):
+
+    conversations_collection.update_one(
+        {"_id": conversation_id},
+        {"$set": {"title": title}}
+    )
     
     
 def update_token_usage(conversation_id, input_tokens, output_tokens):
