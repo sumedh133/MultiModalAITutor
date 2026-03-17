@@ -5,6 +5,8 @@ from bson import ObjectId
 from app.agent.agent import get_agent
 from app.agent.title_generation import generate_chat_title
 
+from app.utils.chat_history import build_chat_history
+
 from app.database.chat_repository import (
     create_conversation,
     add_message,
@@ -19,7 +21,6 @@ def show_chat_page(cookies):
     # ---------------- STYLES ----------------
     st.markdown("""
     <style>
-    /* Button base */
     .stButton > button {
         width: 100%;
         border-radius: 8px;
@@ -27,14 +28,7 @@ def show_chat_page(cookies):
         padding: 0 10px;
     }
 
-    /* TARGET INNER TEXT */
-    .stButton > button div {
-        overflow: hidden;
-        white-space: nowrap;
-        text-overflow: ellipsis;
-    }
-
-    /* Ensure text itself behaves */
+    .stButton > button div,
     .stButton > button p {
         overflow: hidden;
         white-space: nowrap;
@@ -42,30 +36,28 @@ def show_chat_page(cookies):
         margin: 0;
     }
 
-    /* Fix active button "shift" */
     button[kind="secondary"] {
-        padding: 0 10px !important; /* compensate border */
+        padding: 0 10px !important;
     }
     
     .profile-block {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-}
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+    }
 
-.profile-label {
-    font-size: 12px;
-    opacity: 0.7;
-}
+    .profile-label {
+        font-size: 12px;
+        opacity: 0.7;
+    }
 
-.profile-email {
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    max-width: 100%;
-    font-size: 14px;
-}
-
+    .profile-email {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 100%;
+        font-size: 14px;
+    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -149,7 +141,7 @@ def show_chat_page(cookies):
     if st.session_state.conversation_id is None:
         st.info("Start a new conversation by asking a question.")
 
-    # ---------------- LOAD HISTORY ----------------
+    # ---------------- LOAD & DISPLAY HISTORY ----------------
     if st.session_state.conversation_id:
 
         messages = get_messages(st.session_state.conversation_id)
@@ -183,14 +175,22 @@ def show_chat_page(cookies):
         with st.chat_message("user"):
             st.write(user_input)
 
-        # -------- SAVE USER MESSAGE --------
-        add_message(conversation_id, "user", user_input)
-
         # -------- ASSISTANT RESPONSE --------
         with st.chat_message("assistant"):
             with st.spinner("Thinking... 🌱"):
 
-                result = llm.invoke({"messages": [("user", user_input)]})
+                # ✅ ALWAYS FETCH LATEST HISTORY
+                history = get_messages(conversation_id)
+
+                # ✅ BUILD CONTEXT (LAST N MESSAGES)
+                chat_history = build_chat_history(history)
+
+                # ✅ ADD CURRENT USER INPUT
+                chat_history.append(("user", user_input))
+
+                # ✅ CALL AGENT
+                print(chat_history)
+                result = llm.invoke({"messages": chat_history})
 
                 raw_content = result["messages"][-1].content
 
@@ -205,7 +205,10 @@ def show_chat_page(cookies):
 
                 st.write(assistant_reply)
 
-        # -------- SAVE ASSISTANT --------
+        # -------- SAVE USER MESSAGE --------
+        add_message(conversation_id, "user", user_input)
+
+        # -------- SAVE ASSISTANT MESSAGE --------
         add_message(conversation_id, "assistant", assistant_reply)
 
         # -------- TITLE GENERATION --------
@@ -213,5 +216,5 @@ def show_chat_page(cookies):
             title = generate_chat_title(user_input)
             update_conversation_title(conversation_id, title)
 
-        # -------- RERUN FOR SIDEBAR UPDATE --------
+        # -------- RERUN --------
         st.rerun()
