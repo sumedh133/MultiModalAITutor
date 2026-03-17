@@ -15,6 +15,25 @@ from app.database.chat_repository import (
 
 def show_chat_page(cookies):
 
+    st.markdown("""
+<style>
+
+/* Default chat button */
+.stButton > button {
+    width: 100%;
+    text-align: left;
+    border-radius: 8px;
+}
+
+/* Active chat highlight */
+button[kind="secondary"][data-testid="baseButton-secondary"] {
+    border: 2px solid #4CAF50 !important;
+    background-color: rgba(76, 175, 80, 0.1) !important;
+}
+
+</style>
+""", unsafe_allow_html=True)
+    
     # Restore conversation from URL
     params = st.query_params
 
@@ -39,6 +58,7 @@ def show_chat_page(cookies):
             if st.button("↩️", help="Logout"):
                 cookies["auth_token"] = ""
                 cookies.save()
+                st.query_params.clear()
 
                 st.session_state.clear()
                 st.session_state.logout = True
@@ -65,13 +85,14 @@ def show_chat_page(cookies):
         for convo in conversations:
 
             title = convo.get("title", "New Chat")
-
             is_active = convo["_id"] == st.session_state.conversation_id
 
-            label = f"🟢 {title}" if is_active else title
-
-            if st.button(label, key=str(convo["_id"])):
-
+            if st.button(
+                title,
+                key=str(convo["_id"]),
+                use_container_width=True,
+                type="secondary" if is_active else "tertiary"
+            ):
                 st.session_state.conversation_id = convo["_id"]
                 st.query_params["chat"] = str(convo["_id"])
                 st.rerun()
