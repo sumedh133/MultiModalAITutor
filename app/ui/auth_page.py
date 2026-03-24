@@ -38,7 +38,7 @@ def show_auth_page(cookies):
     </style>
     """, unsafe_allow_html=True)
 
-    st.title("🌾 AgriAssist AI")
+    st.title("AI tutor")
 
     tab1, tab2 = st.tabs(["Login", "Register"])
 

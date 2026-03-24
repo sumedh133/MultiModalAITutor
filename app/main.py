@@ -8,11 +8,11 @@ from app.database.user_repository import UserRepository
 import warnings
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 
-st.set_page_config(page_title="AgriAssist AI")
+st.set_page_config(page_title="AI tutor")
 
 
 cookies = EncryptedCookieManager(
-    prefix="AgriBot",
+    prefix="AI tutor",
     password="super_secret_cookie_key"
 )
 

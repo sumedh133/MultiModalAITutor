@@ -74,7 +74,7 @@ def show_chat_page(cookies):
         else:
             st.session_state.conversation_id = None
 
-    st.title("🌾 AgriAssist AI")
+    st.title("AI tutor")
 
     # ---------------- SIDEBAR ----------------
     with st.sidebar:
