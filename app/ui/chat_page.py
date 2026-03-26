@@ -14,9 +14,6 @@ from app.database.chat_repository import (
     get_user_conversations,
     update_conversation_title
 )
-from app.database.profile_repository import ProfileRepository
-from app.models.profile_model import FarmerProfile
-from app.translation.translator import Translator
 from app.memory.conversation_memory import ConversationMemory
 
 
@@ -107,63 +104,6 @@ def show_chat_page(cookies):
 
         st.divider()
 
-        # ---------------- PROFILE FORM ----------------
-        with st.expander("📝 Edit Farmer Profile", expanded=False):
-            
-            profile_repo = ProfileRepository()
-            user_id = str(st.session_state.user["_id"])
-            current_profile = profile_repo.get_profile(user_id)
-
-            if not current_profile:
-                current_profile = FarmerProfile(user_id=user_id)
-
-            # Use simple inputs instead of st.form to avoid "scrambled" overlay
-            new_location = st.text_input("Location", value=current_profile.location)
-            
-            soil_options = ["General", "Alluvial", "Black Soil", "Red Soil", "Laterite", "Sandy", "Clayey"]
-            
-            # Map old "Black (Regur)" if it exists
-            current_soil = current_profile.soil_type
-            if current_soil == "Black (Regur)": current_soil = "Black Soil"
-
-            new_soil = st.selectbox(
-                "Soil Type", 
-                soil_options,
-                index=soil_options.index(current_soil) if current_soil in soil_options else 0
-            )
-
-            new_irrigation = st.selectbox(
-                "Irrigation",
-                ["Rain-fed", "Canal", "Tube Well", "Drip", "Sprinkler"],
-                index=["Rain-fed", "Canal", "Tube Well", "Drip", "Sprinkler"].index(current_profile.irrigation_type) if current_profile.irrigation_type in ["Rain-fed", "Canal", "Tube Well", "Drip", "Sprinkler"] else 0
-            )
-            
-            crops_str = st.text_input("Crops (comma separated)", value=", ".join(current_profile.primary_crops))
-            
-            if st.button("Save Profile"):
-                updated_profile = FarmerProfile(
-                    user_id=user_id,
-                    location=new_location,
-                    soil_type=new_soil,
-                    irrigation_type=new_irrigation,
-                    primary_crops=[c.strip() for c in crops_str.split(",") if c.strip()]
-                )
-                profile_repo.save_profile(updated_profile)
-                st.success("Profile updated!")
-                time.sleep(0.5)
-                st.rerun()
-
-        st.divider()
-
-        # ---------------- LANGUAGE SELECTOR ----------------
-        st.subheader("🌐 Response Language")
-        selected_lang = st.selectbox(
-            "Select Language",
-            ["English", "Hindi", "Marathi", "Telugu", "Tamil", "Gujarati", "Bengali", "Kannada"],
-            index=0
-        )
-
-        st.divider()
 
         conversations = get_user_conversations(
             st.session_state.user["_id"]
@@ -197,11 +137,9 @@ def show_chat_page(cookies):
                 st.rerun()
 
     # ---------------- LLM ----------------
-    profile_repo = ProfileRepository()
-    user_profile = profile_repo.get_profile(str(st.session_state.user["_id"]))
     memory = ConversationMemory()
     user_memories = memory.get_memories(str(st.session_state.user["_id"]))
-    llm = get_agent(profile=user_profile, memories=user_memories)
+    llm = get_agent(memories=user_memories)
 
     # ---------------- EMPTY STATE ----------------
     if st.session_state.conversation_id is None:
@@ -250,47 +188,26 @@ def show_chat_page(cookies):
 
                 # ✅ BUILD CONTEXT (LAST N MESSAGES)
                 chat_history = build_chat_history(history)
-
-                # ---------------- TRANSLATION (INPUT) ----------------
-                translator = Translator()
-                with st.spinner("Translating query..."):
-                    english_input = translator.detect_and_translate_to_english(user_input)
                 
                 # ---------------- SAVE MEMORY ----------------
                 memory.extract_and_save_facts(str(st.session_state.user["_id"]), user_input)
 
                 # ✅ ADD CURRENT USER INPUT (Translated to English for AI)
-                chat_history.append(("user", english_input))
+                chat_history.append(("user", user_input))
 
                 # ✅ CALL AGENT
                 print(f"Chat History (English): {chat_history}")
                 result = llm.invoke({"messages": chat_history})
+                
+                answer = result["messages"][-1].content
 
-                # ---------------- TRANSLATION (OUTPUT) ----------------
-                raw_content = result["messages"][-1].content
-
-                if isinstance(raw_content, list):
-                    assistant_reply_en = "\n".join([
-                        block["text"]
-                        for block in raw_content
-                        if isinstance(block, dict) and "text" in block
-                    ])
-                else:
-                    assistant_reply_en = raw_content
-
-                if selected_lang != "English":
-                    with st.spinner(f"Translating to {selected_lang}... 🌱"):
-                        assistant_reply = translator.translate(assistant_reply_en, selected_lang)
-                else:
-                    assistant_reply = assistant_reply_en
-
-                st.write(assistant_reply)
+                st.write(answer)
 
         # -------- SAVE USER MESSAGE --------
         add_message(conversation_id, "user", user_input)
 
         # -------- SAVE ASSISTANT MESSAGE --------
-        add_message(conversation_id, "assistant", assistant_reply)
+        add_message(conversation_id, "assistant", answer)
 
         # -------- TITLE GENERATION --------
         if is_new_conversation:
