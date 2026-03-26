@@ -31,20 +31,3 @@ class ConversationMemory:
         ).limit(10)  # Limit to the 10 most recent facts
         return [doc["fact"] for doc in docs]
 
-    def extract_and_save_facts(self, user_id: str, user_message: str):
-        """
-        Checks if a user message contains a key agricultural fact worth remembering,
-        and saves it without using any extra AI quota.
-        """
-        # Simple rule-based extraction: look for first-person statements about the farm
-        keywords = [
-            "i have", "my farm", "my field", "my crop", "my land", "i grow",
-            "i plant", "my soil", "my village", "i am from", "i use", "my well",
-            "my irrigation", "my cattle", "i own"
-        ]
-        lower_msg = user_message.lower()
-        if any(kw in lower_msg for kw in keywords):
-            # The message itself is the fact — store a cleaned version
-            fact = user_message.strip()
-            if len(fact) < 300:  # Don't store excessively long messages
-                self.save_memory(user_id, fact)
