@@ -15,6 +15,7 @@ from app.database.chat_repository import (
     update_conversation_title
 )
 from app.memory.conversation_memory import ConversationMemory
+from app.utils.extract_text import extract_text
 
 
 def show_chat_page(cookies):
@@ -189,17 +190,14 @@ def show_chat_page(cookies):
                 # ✅ BUILD CONTEXT (LAST N MESSAGES)
                 chat_history = build_chat_history(history)
                 
-                # ---------------- SAVE MEMORY ----------------
-                memory.extract_and_save_facts(str(st.session_state.user["_id"]), user_input)
 
                 # ✅ ADD CURRENT USER INPUT (Translated to English for AI)
                 chat_history.append(("user", user_input))
 
                 # ✅ CALL AGENT
-                print(f"Chat History (English): {chat_history}")
                 result = llm.invoke({"messages": chat_history})
                 
-                answer = result["messages"][-1].content
+                answer = extract_text(result["messages"][-1])
 
                 st.write(answer)
 
