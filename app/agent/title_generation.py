@@ -1,7 +1,7 @@
 from langchain_google_genai import ChatGoogleGenerativeAI
 from app.config import GOOGLE_API_KEY
 
-def generate_chat_title(user_message):
+def generate_chat_title(user_message, assistant_response=None):
     
     # low temperature for more deterministic titles, can be adjusted as needed
     llm = ChatGoogleGenerativeAI(
@@ -15,6 +15,9 @@ def generate_chat_title(user_message):
 
         User question:
         {user_message}
+        
+        Assistant Response:
+        {assistant_response}
 
         Return ONLY the title.
     """

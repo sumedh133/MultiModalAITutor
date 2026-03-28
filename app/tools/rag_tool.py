@@ -1,15 +1,27 @@
-from langchain_core.tools import tool
+from langchain_core.tools import StructuredTool
 from app.rag.retriever import get_answer_from_documents
 
-@tool
-def document_search_tool(query: str) -> str:
+
+def document_search_tool(conversation_id: str):
     """
-    ALWAYS use this tool FIRST to answer questions about the user's uploaded 
-    study materials, notes, textbooks, or specific concepts they are learning.
-    Input should be the student's question.
+    Creates a conversation-specific document search tool
     """
-    try:
-        response = get_answer_from_documents(query)
-        return response
-    except Exception as e:
-        return f"Could not retrieve documents. Error: {e}"
+
+    def _search(query: str) -> str:
+        try:
+            return get_answer_from_documents(
+                query=query,
+                conversation_id=conversation_id
+            )
+        except Exception as e:
+            return f"Could not retrieve documents. Error: {e}"
+
+    return StructuredTool.from_function(
+        func=_search,
+        name="document_search",
+        description=(
+            "Use this FIRST to answer questions about the user's uploaded "
+            "study materials, notes, textbooks, or concepts."
+        )
+    )
+

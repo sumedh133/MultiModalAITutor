@@ -23,10 +23,13 @@ from app.memory.conversation_memory import ConversationMemory
 def show_chat_page(cookies):
 
     # --------------------------------------------------
-    # Initialize per-chat document tracking
+    # Initialize states
     # --------------------------------------------------
     if "processed_docs" not in st.session_state:
         st.session_state.processed_docs = {}
+
+    if "reset_uploader" not in st.session_state:
+        st.session_state.reset_uploader = False
 
     # ---------------- STYLES ----------------
     st.markdown("""
@@ -115,13 +118,23 @@ def show_chat_page(cookies):
         st.divider()
 
         # ---------------- DOCUMENT UPLOAD ----------------
-        st.header("📂 Study Materials")
+        st.header("Study Materials")
 
-        uploaded_file = st.file_uploader("Upload a PDF", type=["pdf"])
+        # 🔥 controlled reset
+        uploader_key = "file_uploader"
+        if st.session_state.reset_uploader:
+            uploader_key = "file_uploader_reset"
+            st.session_state.reset_uploader = False
+
+        uploaded_file = st.file_uploader(
+            "Upload a PDF",
+            type=["pdf"],
+            key=uploader_key
+        )
 
         if uploaded_file:
 
-            # 🔥 AUTO CREATE CHAT IF NONE
+            # 🔥 auto create chat
             if st.session_state.conversation_id is None:
                 conversation_id = create_conversation(
                     st.session_state.user["_id"]
@@ -140,9 +153,12 @@ def show_chat_page(cookies):
                         tmp_path = tmp_file.name
 
                     try:
-                        process_and_store_document(tmp_path)  # ⚠️ still global (next step)
+                        process_and_store_document(
+                            tmp_path,
+                            str(conversation_id)
+                        )
                         st.session_state.processed_docs[conversation_id] = True
-                        st.success("✅ Document ready for this chat!")
+                        st.success("Document ready for this chat!")
                     except Exception as e:
                         st.error(f"Error: {e}")
                     finally:
@@ -163,6 +179,7 @@ def show_chat_page(cookies):
         with button_col:
             if st.button("➕", help="New Chat"):
                 st.session_state.conversation_id = None
+                st.session_state.reset_uploader = True   # 🔥 FIX
                 st.session_state.pop("messages", None)
                 st.query_params.clear()
                 st.rerun()
@@ -178,13 +195,18 @@ def show_chat_page(cookies):
                 type="secondary" if is_active else "tertiary"
             ):
                 st.session_state.conversation_id = convo["_id"]
+                st.session_state.reset_uploader = True   # 🔥 FIX
                 st.query_params["chat"] = str(convo["_id"])
                 st.rerun()
 
     # ---------------- LLM ----------------
     memory = ConversationMemory()
     user_memories = memory.get_memories(str(st.session_state.user["_id"]))
-    agent_executor = get_agent(memories=user_memories)
+
+    agent_executor = get_agent(
+        memories=user_memories,
+        conversation_id=str(st.session_state.conversation_id)
+    )
 
     # ---------------- EMPTY STATE ----------------
     if st.session_state.conversation_id is None:
@@ -205,7 +227,6 @@ def show_chat_page(cookies):
 
         is_new_conversation = False
 
-        # -------- CREATE CONVO IF NEW --------
         if st.session_state.conversation_id is None:
             conversation_id = create_conversation(
                 st.session_state.user["_id"]
@@ -216,11 +237,9 @@ def show_chat_page(cookies):
 
         conversation_id = st.session_state.conversation_id
 
-        # -------- SHOW USER MESSAGE --------
         with st.chat_message("user"):
             st.write(user_input)
 
-        # -------- ASSISTANT RESPONSE --------
         with st.chat_message("assistant"):
             with st.spinner("Thinking... 📚"):
 
@@ -232,15 +251,22 @@ def show_chat_page(cookies):
                 })
 
                 answer = extract_text(result)
+                print("Agent answer:", result)
                 st.write(answer)
 
-        # -------- SAVE MESSAGES --------
         add_message(conversation_id, "user", user_input)
         add_message(conversation_id, "assistant", answer)
 
-        # -------- TITLE GENERATION --------
-        if is_new_conversation:
-            title = generate_chat_title(user_input)
+        convo = next(
+            (c for c in conversations if c["_id"] == conversation_id),
+            None
+        )
+
+        if convo and (not convo.get("title") or convo.get("title") == "New Chat"):
+            title = generate_chat_title(user_input, assistant_response=answer)
+            update_conversation_title(conversation_id, title)
+            title = generate_chat_title(user_input, assistant_response=answer)
+            print(title)
             update_conversation_title(conversation_id, title)
 
         st.rerun()

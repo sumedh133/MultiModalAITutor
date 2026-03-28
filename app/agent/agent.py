@@ -68,7 +68,7 @@ class CoreAgentExecutor:
         return {"output": final_text.strip()}
 
 
-def get_agent(memories: list = None):
+def get_agent(memories: list = None, conversation_id: str = None):
     """Initializes and returns the AI Tutor agent."""
     
     system_prompt = """
@@ -106,7 +106,7 @@ def get_agent(memories: list = None):
     )
 
     # Retrieve all registered tools
-    tools = get_all_tools()
+    tools = get_all_tools(conversation_id)
 
     # Return our custom, corruption-proof executor
     return CoreAgentExecutor(llm=llm, tools=tools, system_prompt=system_prompt)
