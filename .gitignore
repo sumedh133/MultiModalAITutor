@@ -45,3 +45,5 @@ Thumbs.db
 
 # Local development files
 *.sqlite3
+
+faiss_index/

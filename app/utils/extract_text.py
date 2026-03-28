@@ -1,14 +1,16 @@
-def extract_text(message):
-    content = message.content
+def extract_text(result):
+    output = result.get("output")
 
-    if isinstance(content, str):
-        return content
+    # Case 1: already a string
+    if isinstance(output, str):
+        return output
 
-    if isinstance(content, list):
+    # Case 2: list of blocks
+    if isinstance(output, list):
         return " ".join(
             block.get("text", "")
-            for block in content
+            for block in output
             if isinstance(block, dict)
         )
 
-    return str(content)
+    return str(result)

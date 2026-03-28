@@ -1,5 +1,5 @@
 [project]
-name = "agribot"
+name = "MultiModalAITutor"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
@@ -19,4 +19,5 @@ dependencies = [
     "streamlit>=1.55.0",
     "streamlit-cookies-manager>=0.2.0",
     "tavily-python>=0.7.23",
+    "torchvision>=0.26.0",
 ]
