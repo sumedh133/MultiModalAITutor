@@ -1,88 +1,112 @@
 from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain.agents import create_agent
+from langchain_core.messages import ToolMessage
 from app.config import GOOGLE_API_KEY
 from app.agent.tools_registry import get_all_tools
 
-def get_agent( memories: list = None):
-    """Initializes and returns the modern LangChain v1 agent with personalized profile context."""
-    
-    personalized_system_prompt = """
-        You are AgriAssist AI, an expert agricultural assistant designed to help farmers in India.
+class CoreAgentExecutor:
+    """
+    A lightweight, custom tool-execution loop built purely on langchain-core 
+    to bypass corrupted langchain.agents installations.
+    """
+    def __init__(self, llm, tools, system_prompt):
+        # Bind the tools directly to the Gemini LLM
+        self.llm = llm.bind_tools(tools)
+        self.tools = {tool.name: tool for tool in tools}
+        self.system_prompt = system_prompt
 
-        Your goal is to provide clear, practical, and accurate farming advice that is easy to understand and actionable.
+    def invoke(self, inputs):
+        messages = inputs.get("messages", [])
+        
+        # 1. Prepend the system prompt to the conversation history
+        full_messages = [("system", self.system_prompt)] + messages
+        
+        # 2. Ask the LLM what to do (it will either answer or request a tool)
+        response = self.llm.invoke(full_messages)
+        
+        # 3. If no tools are requested, return the final answer!
+        if not response.tool_calls:
+            return {"output": response.content}
+        
+        # 4. If tools ARE requested, execute them
+        full_messages.append(response) # Save the AI's tool request to history
+        
+        for tool_call in response.tool_calls:
+            tool_name = tool_call["name"]
+            tool_args = tool_call["args"]
+            tool_id = tool_call["id"]
+            
+            # Run the specific tool (RAG or Web Search)
+            if tool_name in self.tools:
+                try:
+                    print(f"🛠️ Agent is using tool: {tool_name}")
+                    tool_result = self.tools[tool_name].invoke(tool_args)
+                except Exception as e:
+                    tool_result = f"Error executing tool: {e}"
+            else:
+                tool_result = f"Error: Tool {tool_name} not found."
+                
+            # Append the result of the tool back to the conversation
+            full_messages.append(ToolMessage(content=str(tool_result), tool_call_id=tool_id))
+        
+        # 5. Send the tool results back to the LLM to formulate the final user answer
+        final_response = self.llm.invoke(full_messages)
+        
+        # Safely extract the text, whether it is a string or a JSON content block
+        final_text = ""
+        if isinstance(final_response.content, str):
+            final_text = final_response.content
+        elif isinstance(final_response.content, list):
+            # Loop through the blocks and grab only the text parts
+            final_text = "".join(
+                block.get("text", "") 
+                for block in final_response.content 
+                if isinstance(block, dict) and block.get("type") == "text"
+            )
+        else:
+            final_text = str(final_response.content)
+            
+        return {"output": final_text.strip()}
+
+
+def get_agent(memories: list = None):
+    """Initializes and returns the AI Tutor agent."""
+    
+    system_prompt = """
+        You are the Multimodal AI Tutor, an intelligent educational assistant.
+        
+        Your goal is to help students learn from structured and unstructured study materials 
+        using clear explanations, step-by-step breakdowns, and context-aware answers.
+
+        Tool Usage Rules:
+        1. DOCUMENT SEARCH (RAG): Always use the document search tool FIRST if the user asks about 
+           their uploaded study materials, textbook concepts, or chapter specific questions.
+        2. WEB SEARCH FALLBACK: If the document search returns no relevant context, or if the user 
+           asks a general knowledge question outside their notes, fallback to the web search tool.
+           
+        Response Style:
+        - Keep explanations clear and conceptual.
+        - Provide step-by-step breakdowns for complex problems or derivations.
+        - If the answer is not in the documents, clearly state that you are using external knowledge.
     """
     
-
     if memories:
-        personalized_system_prompt += f"""
+        system_prompt += f"""
             ---
-            LONG-TERM MEMORY (What this farmer has shared in past conversations)
+            LONG-TERM MEMORY (What this student has shared in past sessions):
             {chr(10).join(f"- {m}" for m in memories)}
             ---
-            Use this context to provide more personalized advice without asking the farmer to repeat themselves.
+            Use this context to provide personalized tutoring without asking the student to repeat themselves.
         """
-    
-    personalized_system_prompt += """
-        Scope
-        You specialize ONLY in agriculture-related topics, including:
-        - Crops and crop selection
-        - Soil and fertilizers
-        - Weather and irrigation
-        - Pests and diseases
-        - Market prices and mandi data
-        - Farming techniques and best practices
-
-        If a question is NOT related to farming or agriculture:
-        → Politely refuse and guide the user back to relevant topics.
-
-        Example:
-        "That's outside my area of expertise. I specialize in agriculture and farming advice—feel free to ask about crops, weather, soil, or pest management."
-
-        Tool Usage Rules
-        - Use tools when real-time, location-specific, or up-to-date information is required.
-        - For weather-related decisions (e.g., spraying pesticides, planning irrigation), use the weather tool. It provides a **5-day forecast** that you must use to answer questions about the future.
-        - For crop diseases, pests, or recent outbreaks, use the search tool.
-        - Do NOT use tools for basic or general knowledge questions.
-
-        Decision Guidelines
-        - Prefer tool usage when accuracy depends on current data.
-        - If tool results are unavailable or unclear, provide the best possible general guidance and clearly mention uncertainty.
-        - Avoid unnecessary tool calls.
-
-        Response style
-        - Keep answers concise, clear, and practical.
-        - Use simple language suitable for farmers.
-        - Avoid technical jargon unless necessary.
-        - Ask follow up questions if necessary
-        - When giving advice, include:
-        1. What to do
-        2. When to do it
-        3. Why it matters (briefly)
-
-        Safety Guidelines
-        - Do NOT provide harmful or unsafe agricultural advice.
-        - If unsure, recommend consulting a local agricultural expert or extension service.
-        - Be cautious with pesticide recommendations and always consider weather conditions.
-
-        Goal
-        Always aim to give the most reliable, practical, and helpful farming advice tailored to real-world conditions.
-    """
-    
-    # 1. Initialize the LLM
+        
+    # Initialize the core LLM
     llm = ChatGoogleGenerativeAI(
         model="gemini-2.5-flash", 
         temperature=0.2, 
         google_api_key=GOOGLE_API_KEY
     )
 
-    # 2. Retrieve all registered tools
+    # Retrieve all registered tools
     tools = get_all_tools()
 
-    # 3. Create the Agent (No AgentExecutor needed anymore!)
-    agent = create_agent(
-        model=llm,
-        tools=tools,
-        system_prompt=personalized_system_prompt,
-    )
-    
-    return agent
+    # Return our custom, corruption-proof executor
+    return CoreAgentExecutor(llm=llm, tools=tools, system_prompt=system_prompt)
