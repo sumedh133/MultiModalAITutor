@@ -6,9 +6,10 @@ import os
 import tempfile
 
 from app.agent.agent import get_agent
-from app.agent.title_generation import generate_chat_title
+from app.agent.generation import generate_chat_title, process_image
 from app.rag.ingestion import process_and_store_document
 from app.utils.extract_text import extract_text
+from app.utils.hash import get_file_hash
 from app.utils.chat_history import build_chat_history
 from app.database.chat_repository import (
     create_conversation,
@@ -19,17 +20,23 @@ from app.database.chat_repository import (
 )
 from app.memory.conversation_memory import ConversationMemory
 
+MAX_TOTAL_SIZE_MB = 10
+MAX_IMAGES = 2
+MAX_PDFS = 1
+
 
 def show_chat_page(cookies):
 
     # --------------------------------------------------
     # Initialize states
     # --------------------------------------------------
-    if "processed_docs" not in st.session_state:
-        st.session_state.processed_docs = {}
 
     if "reset_uploader" not in st.session_state:
         st.session_state.reset_uploader = False
+        
+    # ---------------- INIT ----------------
+    if "processed_files" not in st.session_state:
+        st.session_state.processed_files = {}
 
     # ---------------- STYLES ----------------
     st.markdown("""
@@ -126,15 +133,17 @@ def show_chat_page(cookies):
             uploader_key = "file_uploader_reset"
             st.session_state.reset_uploader = False
 
-        uploaded_file = st.file_uploader(
-            "Upload a PDF",
-            type=["pdf"],
+        uploaded_files = st.file_uploader(
+            "Upload 1 PDF + up to 2 images",
+            type=["pdf", "png", "jpg", "jpeg"],
+            accept_multiple_files=True,
             key=uploader_key
         )
 
-        if uploaded_file: 
+        # ---------------- UPLOAD HANDLER ----------------
+        if uploaded_files:
 
-            # 🔥 auto create chat
+            # ensure conversation exists
             if st.session_state.conversation_id is None:
                 conversation_id = create_conversation(
                     st.session_state.user["_id"]
@@ -144,26 +153,84 @@ def show_chat_page(cookies):
             else:
                 conversation_id = st.session_state.conversation_id
 
-            already_processed = st.session_state.processed_docs.get(conversation_id, False)
+            convo_id = str(conversation_id)
 
-            if not already_processed:
+            if convo_id not in st.session_state.processed_files:
+                st.session_state.processed_files[convo_id] = set()
+
+            # -------- FILTER NEW FILES --------
+            new_files = []
+            for f in uploaded_files:
+                file_hash = get_file_hash(f)
+
+                if file_hash not in st.session_state.processed_files[convo_id]:
+                    new_files.append((f, file_hash))
+
+            # 👉 nothing new → skip processing
+            if not new_files:
+                pass
+            else:
+                # -------- VALIDATION (ONLY NEW FILES) --------
+                pdfs = [f for f, _ in new_files if f.type == "application/pdf"]
+                images = [f for f, _ in new_files if f.type.startswith("image/")]
+
+                total_size = sum(f.size for f, _ in new_files) / (1024 * 1024)
+
+                if len(pdfs) > MAX_PDFS:
+                    st.error("Only 1 PDF allowed")
+                    st.stop()
+
+                if len(images) > MAX_IMAGES:
+                    st.error("Max 2 images allowed")
+                    st.stop()
+
+                if total_size > MAX_TOTAL_SIZE_MB:
+                    st.error(f"Total upload must be under {MAX_TOTAL_SIZE_MB} MB")
+                    st.stop()
+
+                # -------- PROCESS --------
                 with st.spinner("Analyzing document..."):
-                    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
-                        tmp_file.write(uploaded_file.getvalue())
-                        tmp_path = tmp_file.name
-
                     try:
-                        process_and_store_document(
-                            tmp_path,
-                            str(conversation_id)
-                        )
-                        st.session_state.processed_docs[conversation_id] = True
-                        st.success("Document ready for this chat!")
+                        for file, file_hash in new_files:
+
+                            # -------- PDF --------
+                            if file.type == "application/pdf":
+                                with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
+                                    tmp_file.write(file.getvalue())
+                                    tmp_path = tmp_file.name
+
+                                process_and_store_document(
+                                    conversation_id=convo_id,
+                                    file_path=tmp_path
+                                )
+
+                                os.remove(tmp_path)
+
+                            # -------- IMAGE --------
+                            elif file.type.startswith("image/"):
+                                with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp_file:
+                                    tmp_file.write(file.getvalue())
+                                    tmp_path = tmp_file.name
+
+                                extracted_text = process_image(tmp_path)
+
+                                process_and_store_document(
+                                    conversation_id=convo_id,
+                                    raw_text=extracted_text
+                                )
+
+                                os.remove(tmp_path)
+
+                                st.image(file, caption=file.name, use_container_width=True)
+
+                            # ✅ mark processed
+                            st.session_state.processed_files[convo_id].add(file_hash)
+
+                        st.success("New content added to this chat!")
+
                     except Exception as e:
                         st.error(f"Error: {e}")
-                    finally:
-                        os.remove(tmp_path)
-
+            
         st.divider()
 
         # ---------------- CHAT LIST ----------------
@@ -265,7 +332,6 @@ def show_chat_page(cookies):
         if convo and (not convo.get("title") or convo.get("title") == "New Chat"):
             title = generate_chat_title(user_input, assistant_response=answer)
             update_conversation_title(conversation_id, title)
-            title = generate_chat_title(user_input, assistant_response=answer)
             print(title)
             update_conversation_title(conversation_id, title)
 
