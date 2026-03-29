@@ -132,7 +132,7 @@ def show_chat_page(cookies):
             key=uploader_key
         )
 
-        if uploaded_file:
+        if uploaded_file: 
 
             # 🔥 auto create chat
             if st.session_state.conversation_id is None:
