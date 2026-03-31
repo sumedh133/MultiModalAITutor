@@ -18,5 +18,4 @@ dependencies = [
     "streamlit>=1.55.0",
     "streamlit-cookies-manager>=0.2.0",
     "tavily-python>=0.7.23",
-    "torchvision>=0.26.0",
 ]
