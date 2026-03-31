@@ -68,7 +68,7 @@ class CoreAgentExecutor:
         return {"output": final_text.strip()}
 
 
-def get_agent(memories: list = None):
+def get_agent(memories: list = None, conversation_id: str = None):
     """Initializes and returns the AI Tutor agent."""
     
     system_prompt = """
@@ -79,7 +79,7 @@ def get_agent(memories: list = None):
 
         Tool Usage Rules:
         1. DOCUMENT SEARCH (RAG): Always use the document search tool FIRST if the user asks about 
-           their uploaded study materials, textbook concepts, or chapter specific questions.
+           their uploaded study materials, textbook concepts, or chapter specific questions. The document search tool has access to the content of their PDFs and notes and images uploaded like diagrams, so it should be your primary resource for answering questions related to those materials.
         2. WEB SEARCH FALLBACK: If the document search returns no relevant context, or if the user 
            asks a general knowledge question outside their notes, fallback to the web search tool.
            
@@ -106,7 +106,7 @@ def get_agent(memories: list = None):
     )
 
     # Retrieve all registered tools
-    tools = get_all_tools()
+    tools = get_all_tools(conversation_id)
 
     # Return our custom, corruption-proof executor
     return CoreAgentExecutor(llm=llm, tools=tools, system_prompt=system_prompt)
